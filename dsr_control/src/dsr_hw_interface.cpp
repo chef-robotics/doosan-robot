@@ -91,8 +91,8 @@ namespace dsr_control{
         float preTargetTime = 0.0;
         float targetTime = 0.0;
 
-        int nCntTargetPos = goal->trajectory.points.size();       
-        std::vector<std::array<float, NUM_JOINT>> fTargetPos{nCntTargetPos, {}};
+        size_t nCntTargetPos = goal->trajectory.points.size();       
+        std::vector<std::array<float, NUM_JOINT>> fTargetPos{nCntTargetPos, {0}};
         
         // if (nCntTargetPos > MAX_SPLINE_POINT)
         // {
@@ -864,15 +864,19 @@ namespace dsr_control{
 
         ROS_INFO("[dsr_hw_interface] constructed");
         ros::V_string arm_joint_names;
+        // CHEF: for now don't support m_strRobotGripper, it reads off the bounds of the joints array
+        /*
         if(m_strRobotGripper == "robotiq_2f"){
             arm_joint_names =
             boost::assign::list_of("joint1")("joint2")("joint3")("joint4")("joint5")("joint6")("robotiq_85_left_knuckle_joint").convert_to_container<ros::V_string>();
         }
         else if(m_strRobotGripper == "none")
-        {
+        {*/
             arm_joint_names =
             boost::assign::list_of("joint1")("joint2")("joint3")("joint4")("joint5")("joint6").convert_to_container<ros::V_string>();
+            /*
         }
+            */
         for(unsigned int i = 0; i < arm_joint_names.size(); i++){
             hardware_interface::JointStateHandle jnt_state_handle(
                 arm_joint_names[i],
@@ -1225,9 +1229,12 @@ namespace dsr_control{
             joints[i].pos = deg2rad(pose->_fPosition[i]);	//update pos to Rviz
             msg.data.push_back(joints[i].pos);
         }
+        // CHEF: for now don't support m_strRobotGripper, it reads off the bounds of the joints array
+        /*
         if(m_strRobotGripper != "none"){
             msg.data.push_back(joints[6].pos);
         }
+        */
         m_PubtoGazebo.publish(msg);
     }
     void DRHWInterface::write(ros::Duration& elapsed_time)
