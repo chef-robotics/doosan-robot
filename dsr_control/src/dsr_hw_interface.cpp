@@ -91,11 +91,9 @@ namespace dsr_control{
         float preTargetTime = 0.0;
         float targetTime = 0.0;
 
-        int nCntTargetPos = goal->trajectory.points.size();
-
-        float fTargetPos[nCntTargetPos][NUM_JOINT] = {
-            0.0,
-        };
+        int nCntTargetPos = goal->trajectory.points.size();       
+        std::vector<std::array<float, NUM_JOINT>> fTargetPos{nCntTargetPos, {}};
+        
         // if (nCntTargetPos > MAX_SPLINE_POINT)
         // {
         //     ROS_INFO("DRHWInterface::trajectoryCallback over max Trajectory (%d > %d)", nCntTargetPos, MAX_SPLINE_POINT);
