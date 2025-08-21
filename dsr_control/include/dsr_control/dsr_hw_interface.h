@@ -35,7 +35,8 @@
  *  ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  *********************************************************************/
-#define _DEBUG_DSR_CTL      1
+// CHEF: turn off debug prints, also stop more C++ errors
+#define _DEBUG_DSR_CTL      0
 
 #ifndef DR_HW_INTERFACE_H
 #define DR_HW_INTERFACE_H
