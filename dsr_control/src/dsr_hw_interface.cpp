@@ -493,10 +493,10 @@ namespace dsr_control{
         switch((unsigned char)eState)
         {
 #if 1 // TP initializing logic, Don't use in API level. (If you want to operate without TP, use this logic)
-        case eSTATE_NOT_READY:
+        case STATE_NOT_READY:
         if (g_bHasControlAuthority) Drfl.SetRobotControl(CONTROL_INIT_CONFIG);
             break;
-        case eSTATE_INITIALIZING:
+        case STATE_INITIALIZING:
             // add initalizing logic
             if (g_bHasControlAuthority) Drfl.SetRobotControl(CONTROL_ENABLE_OPERATION);
             break;
