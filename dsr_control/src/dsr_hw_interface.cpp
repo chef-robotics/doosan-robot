@@ -492,7 +492,7 @@ namespace dsr_control{
         ROS_INFO("On Monitor State");
         switch((unsigned char)eState)
         {
-#if 0 // TP initializing logic, Don't use in API level. (If you want to operate without TP, use this logic)
+#if 1 // TP initializing logic, Don't use in API level. (If you want to operate without TP, use this logic)
         case eSTATE_NOT_READY:
         if (g_bHasControlAuthority) Drfl.SetRobotControl(CONTROL_INIT_CONFIG);
             break;
