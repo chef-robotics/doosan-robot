@@ -92,7 +92,6 @@ namespace dsr_control{
         float targetTime = 0.0;
 
         size_t nCntTargetPos = goal->trajectory.points.size();       
-        std::vector<std::array<float, NUM_JOINT>> fTargetPos{nCntTargetPos, {0}};
         
         // if (nCntTargetPos > MAX_SPLINE_POINT)
         // {
@@ -105,6 +104,11 @@ namespace dsr_control{
 
         for (int i = 0; i < nCntTargetPos; i++) //=10
         {
+            // CHEF: handle empty first position
+            if(goal->trajectory.points[i].positions.empty()) {
+                continue;
+            }
+
             std::array<float, NUM_JOINT> degrees;
             ros::Duration d(goal->trajectory.points[i].time_from_start);
 
@@ -125,8 +129,6 @@ namespace dsr_control{
                 run MoveJ(position, time_From_start)
                 */
                 degrees[j] = rad2deg(goal->trajectory.points[i].positions[j]);
-
-                fTargetPos[i][j] = degrees[j];
             }
 
             ros::Duration step_duration = d - (ros::Time::now() - begin);
