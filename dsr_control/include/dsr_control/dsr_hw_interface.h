@@ -529,7 +529,7 @@ namespace dsr_control{
     class DRHWInterface : public hardware_interface::RobotHW
     {
     public:
-        DRHWInterface(ros::NodeHandle& nh);
+        DRHWInterface(ros::NodeHandle& nh, ros::NodeHandle& pnh);
         virtual ~DRHWInterface();
 
         bool init();

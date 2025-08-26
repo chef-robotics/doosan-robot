@@ -845,8 +845,8 @@ namespace dsr_control{
         }
     }
 
-    DRHWInterface::DRHWInterface(ros::NodeHandle& nh):
-        private_nh_(nh),
+    DRHWInterface::DRHWInterface(ros::NodeHandle& nh, ros::NodeHandle& pnh):
+        private_nh_(pnh),
         m_server_joint_trajectory(nh, "dsr_joint_trajectory_controller/follow_joint_trajectory")
     {
         /*

@@ -84,10 +84,15 @@ int main(int argc, char** argv) {
                           .convert_to_container<ros::V_string>();
 
     DRHWInterface* pArm = NULL;
-    pArm = new DRHWInterface(private_nh);
+    // CHEF: use regular nodehandle instead of pnh for namespacing
+    ros::NodeHandle nh;
+    pArm = new DRHWInterface(nh, private_nh);
+    //
+
     private_nh.getParam("name", pArm->m_strRobotName);
     private_nh.getParam("model", pArm->m_strRobotModel);
     private_nh.getParam("moveit", pArm->m_moveit);
+    // TODO(kyle): just publish on joint_states and let nh handle it!
     ros::Publisher PubJointState =
         private_nh.advertise<sensor_msgs::JointState>(
             "/" + pArm->m_strRobotName + pArm->m_strRobotModel + "/joint_states", 1);
@@ -96,7 +101,7 @@ int main(int argc, char** argv) {
         ROS_ERROR("[dsr_control] Error initializing robot");
         return -1;
     }
-    controller_manager::ControllerManager cm(pArm, private_nh);
+    controller_manager::ControllerManager cm(pArm, nh);
     ros::AsyncSpinner spinner(1);
     spinner.start();
     
