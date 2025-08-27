@@ -511,21 +511,6 @@ using namespace DRAFramework;
 
 namespace dsr_control{
 
-    class JointTrajectoryAction
-    {
-    protected:
-        actionlib::SimpleActionServer<control_msgs::FollowJointTrajectoryAction> as_; // NodeHandle instance must be created before this line. Otherwise strange error occurs.
-        std::string action_name_;
-        // create messages that are used to published feedback/result
-        control_msgs::FollowJointTrajectoryFeedback feedback_;
-        control_msgs::FollowJointTrajectoryResult result_;
-
-    public:
-        JointTrajectoryAction(ros::NodeHandle nh, std::string name);
-
-        void trajectoryCallback(const control_msgs::FollowJointTrajectoryGoalConstPtr& msg);
-    };
-
     class DRHWInterface : public hardware_interface::RobotHW
     {
     public:
@@ -568,13 +553,13 @@ namespace dsr_control{
         std::string m_strRobotGripper;
         bool m_moveit;
         struct Joint{
-            double cmd;
             double pos;
             double vel;
             double eff;
-            Joint(): cmd(0), pos(0), vel(0), eff(0) {}
+            Joint(): pos(0), vel(0), eff(0) {}
         } joints[NUM_JOINT];
-
+        std::array<double, NUM_JOINT> joint_command_positions = {};
+        std::array<double, NUM_JOINT> last_joint_command_positions = {};
     private:
         int  m_nVersionDRCF;
         bool m_bIsEmulatorMode; 
@@ -618,7 +603,6 @@ namespace dsr_control{
         ros::Publisher m_PubTorqueRTStream;
 
         //----- Subscriber ------------------------------------------------------------
-        JointTrajectoryAction m_server_joint_trajectory;
         ros::Subscriber m_sub_joint_position;
         ros::Subscriber m_sub_move_gruop_joint_position;
         ros::Subscriber m_SubSerialRead;
@@ -647,7 +631,6 @@ namespace dsr_control{
         //----- SIG Handler --------------------------------------------------------------
         void sigint_handler( int signo);
 
-        void trajectoryCallback(const control_msgs::FollowJointTrajectoryActionGoal::ConstPtr& msg);
         void positionCallback(const std_msgs::Float64MultiArray::ConstPtr& msg);
         void movegroupPositionCallback(const sensor_msgs::JointState::ConstPtr& msg);
 

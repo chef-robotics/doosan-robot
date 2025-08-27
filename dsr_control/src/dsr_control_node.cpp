@@ -22,6 +22,7 @@ using namespace dsr_control;
 int g_nKill_dsr_control = false;
 
 bool isEmulatorRunning() {
+    return false;
     FILE *cmd_pipe = popen("docker ps -q --filter name=emulator", "r");
     if (!cmd_pipe) {
         ROS_ERROR("[dsr_control] An error occurred while executing the command.");
@@ -71,7 +72,7 @@ int main(int argc, char** argv) {
     ros::init(argc, argv, "dsr_control_node",
               ros::init_options::NoSigintHandler);
     ros::NodeHandle private_nh("~");
-    signal(SIGINT, SigHandler);
+    //signal(SIGINT, SigHandler);
     //----- get param ---------------------
     int rate;
     private_nh.param<int>("rate", rate, 100);
@@ -102,6 +103,8 @@ int main(int argc, char** argv) {
         return -1;
     }
     controller_manager::ControllerManager cm(pArm, nh);
+    cm.loadController("dsr_joint_position_controller");
+    cm.loadController("dsr_joint_trajectory_controller");
     ros::AsyncSpinner spinner(1);
     spinner.start();
     

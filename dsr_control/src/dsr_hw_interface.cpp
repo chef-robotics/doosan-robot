@@ -75,155 +75,6 @@ namespace dsr_control{
             return false;
     }
 
-    JointTrajectoryAction::JointTrajectoryAction(ros::NodeHandle nh, std::string name) :
-        as_(nh, name, boost::bind(&JointTrajectoryAction::trajectoryCallback, this, _1), false),
-        action_name_(name)
-    {
-        as_.start();
-    }
-
-    void JointTrajectoryAction::trajectoryCallback(const control_msgs::FollowJointTrajectoryGoalConstPtr &goal)
-    {
-        ROS_INFO("callback: Trajectory received");
-        ROS_INFO("  goal->trajectory.points.size() =%d", (int)goal->trajectory.points.size());           //=10 가변젹
-        ROS_INFO("  goal->trajectory.joint_names.size() =%d", (int)goal->trajectory.joint_names.size()); //=6
-
-        float preTargetTime = 0.0;
-        float targetTime = 0.0;
-
-        size_t nCntTargetPos = goal->trajectory.points.size();       
-        
-        // if (nCntTargetPos > MAX_SPLINE_POINT)
-        // {
-        //     ROS_INFO("DRHWInterface::trajectoryCallback over max Trajectory (%d > %d)", nCntTargetPos, MAX_SPLINE_POINT);
-        //     as_.setAborted(result_);
-        //     return;
-        // }
-
-        ros::Time begin = ros::Time::now();
-
-        for (int i = 0; i < nCntTargetPos; i++) //=10
-        {
-            // CHEF: handle empty first position
-            if(goal->trajectory.points[i].positions.empty()) {
-                continue;
-            }
-
-            std::array<float, NUM_JOINT> degrees;
-            ros::Duration d(goal->trajectory.points[i].time_from_start);
-
-            // ROS_INFO("  goal->trajectory.points[%d].time_from_start = %7.3%f",i,(float)goal->trajectory.points[i].time_from_start );
-
-            targetTime = d.toSec();
-            /// ROS_INFO("[trajectory] preTargetTime: %7.3f", preTargetTime);
-            /// targetTime = targetTime - preTargetTime;
-            /// preTargetTime = targetTime;
-            /// ROS_INFO("[trajectory] time_from_start: %7.3f", targetTime);
-
-            for (int j = 0; j < goal->trajectory.joint_names.size(); j++) //=6
-            {
-                // ROS_INFO("[trajectory] %d-pos: %7.3f", j, goal->trajectory.points[i].positions[j]);
-                /* todo
-                get a position & time_from_start
-                convert radian to degree the position
-                run MoveJ(position, time_From_start)
-                */
-                degrees[j] = rad2deg(goal->trajectory.points[i].positions[j]);
-            }
-
-            ros::Duration step_duration = d - (ros::Time::now() - begin);
-            float blending_radius = 50;
-
-            if (as_.isPreemptRequested() || !ros::ok())
-            {
-                ROS_INFO("%s: Preempted", action_name_.c_str());
-                // set the action state to preempted
-                as_.setPreempted();
-                return;
-            }
-            ROS_INFO("[trajectory] [%02d : %.3f : %.3f] %7.3f %7.3f %7.3f %7.3f %7.3f %7.3f", i, targetTime, step_duration.toSec(), rad2deg(goal->trajectory.points[i].positions[0]), rad2deg(goal->trajectory.points[i].positions[1]), rad2deg(goal->trajectory.points[i].positions[2]), rad2deg(goal->trajectory.points[i].positions[3]), rad2deg(goal->trajectory.points[i].positions[4]), rad2deg(goal->trajectory.points[i].positions[5]));
-
-            Drfl.MoveJAsync(degrees.data(), 50, 50, step_duration.toSec()+0.25, MOVE_MODE_ABSOLUTE, BLENDING_SPEED_TYPE_OVERRIDE);
-
-            // ros::Time::sleepUntil(begin + d - ros::Duration(0.5));
-            ros::Time::sleepUntil(begin + d);
-        }
-        Drfl.MoveWait();
-        // ROS_INFO("CALLING MOVESJ");
-        // Drfl.movesj(fTargetPos, nCntTargetPos, 0.0, 0.0, targetTime, (MOVE_MODE)MOVE_MODE_ABSOLUTE);
-        // ROS_INFO("CALLED MOVESJ");
-        /*
-        for(int i = 0; i < NUM_JOINT; i++){
-            ROS_INFO("[]::cmd %d-pos: %7.3f", i, joints[i].cmd);
-            cmd_[i] = joints[i].cmd;
-        }
-        */
-        as_.setSucceeded(result_);
-    }
-    // Next Controller Version
-
-    // void JointTrajectoryAction::trajectoryCallback(const control_msgs::FollowJointTrajectoryGoalConstPtr &goal)
-    // {
-    //     ROS_INFO("callback: Trajectory received");
-    //     ROS_INFO("  goal->trajectory.points.size() =%d", (int)goal->trajectory.points.size());           //=10 가변젹
-    //     ROS_INFO("  goal->trajectory.joint_names.size() =%d", (int)goal->trajectory.joint_names.size()); //=6
-
-    //     float preTargetTime = 0.0;
-    //     float targetTime = 0.0;
-    //     int nCntTargetPos = goal->trajectory.points.size();
-    //     float fTargetPos[nCntTargetPos][NUM_JOINT] = {
-    //         0.0,
-    //     };
-    //     double dt = 0.0;
-
-    //     ros::Time begin = ros::Time::now();
-    //     Drfl.set_safety_mode((SAFETY_MODE)1, (SAFETY_MODE_EVENT)1);
-
-    //     for (int i = 0; i < nCntTargetPos; i++) //=10
-    //     {
-    //         std::array<float, NUM_JOINT> degrees;
-    //         ros::Duration d(goal->trajectory.points[i].time_from_start);
-    //         targetTime = d.toSec();
-    //         ROS_INFO("[trajectory] preTargetTime: %7.3f", preTargetTime);
-    //         ROS_INFO("[trajectory] TargetTime: %7.3f", targetTime);
-    //         dt = targetTime - preTargetTime;
-    //         preTargetTime = targetTime;
-    //         ROS_INFO("[trajectory] dt: %7.3f", dt);
-
-    //         for (int j = 0; j < goal->trajectory.joint_names.size(); j++) //=6
-    //         {
-    //             degrees[j] = rad2deg(goal->trajectory.points[i].positions[j]);
-    //             fTargetPos[i][j] = degrees[j];
-    //         }
-
-    //         ros::Duration step_duration = d - (ros::Time::now() - begin);
-    //         float blending_radius = 50;
-
-    //         if (as_.isPreemptRequested() || !ros::ok())
-    //         {
-    //             ROS_INFO("%s: Preempted", action_name_.c_str());
-    //             // set the action state to preempted
-    //             as_.setPreempted();
-    //             return;
-    //         }
-    //         ROS_INFO("[trajectory] [%02d : %.3f : %.3f] %7.3f %7.3f %7.3f %7.3f %7.3f %7.3f", i, dt, step_duration.toSec(), rad2deg(goal->trajectory.points[i].positions[0]), rad2deg(goal->trajectory.points[i].positions[1]), rad2deg(goal->trajectory.points[i].positions[2]), rad2deg(goal->trajectory.points[i].positions[3]), rad2deg(goal->trajectory.points[i].positions[4]), rad2deg(goal->trajectory.points[i].positions[5]));
-    //         float TargetVel[6] = {100.0f, 100.0f, 100.0f, 100.0f, 100.0f, 100.0f};
-    //         float TargetAcc[6] = {100.0f, 100.0f, 100.0f, 100.0f, 100.0f, 100.0f};
-
-    //         Drfl.servoj(degrees.data(), TargetVel, TargetAcc, dt);
-    //         int delay;
-    //         ros::param::param<int>("~standby", delay, 5000);
-    //         usleep(delay);
-            
-    //         if(i == nCntTargetPos-1){
-    //             while ((Drfl.get_robot_state() != STATE_STANDBY)){
-    //                usleep(delay);
-    //             }
-    //             Drfl.set_safety_mode((SAFETY_MODE)1, (SAFETY_MODE_EVENT)2);
-    //             as_.setSucceeded(result_);
-    //         }
-    //     }       
-    // }
 
     //----- register the call-back functions ----------------------------------------
     void DRHWInterface::OnTpInitializingCompletedCB()
@@ -848,9 +699,7 @@ namespace dsr_control{
     }
 
     DRHWInterface::DRHWInterface(ros::NodeHandle& nh, ros::NodeHandle& pnh):
-        private_nh_(pnh),
-        m_server_joint_trajectory(nh, "dsr_joint_trajectory_controller/follow_joint_trajectory")
-    {
+        private_nh_(pnh)    {
         /*
         <arg name="ns"    value="$(arg ns)"/>
         <arg name="model" value="$(arg model)"/>
@@ -889,7 +738,7 @@ namespace dsr_control{
 
             hardware_interface::JointHandle jnt_pos_handle(
                 jnt_state_handle,
-                &joints[i].cmd);
+                &joint_command_positions[i]);
             jnt_pos_interface.registerHandle(jnt_pos_handle);
         }
         registerInterface(&jnt_state_interface);
@@ -1204,17 +1053,46 @@ namespace dsr_control{
             //--- Set Robot mode : MANUAL or AUTO
             //assert(Drfl.SetRobotMode(ROBOT_MODE_MANUAL));
             assert(Drfl.set_robot_mode(ROBOT_MODE_AUTONOMOUS));
-
+            
             //--- Set Robot mode : virual or real
             ROBOT_SYSTEM eTargetSystem = ROBOT_SYSTEM_VIRTUAL;
             if(mode == "real") eTargetSystem = ROBOT_SYSTEM_REAL;
             assert(Drfl.set_robot_system(eTargetSystem));
-
-            // to compare with joints[].cmd
-            for(int i = 0; i < NUM_JOINT; i++){
-                ROS_INFO("[init]::read %d-pos: %7.3f", i, joints[i].cmd);
-                cmd_[i] = joints[i].cmd;
+            
+            assert(Drfl.set_robot_speed_mode(SPEED_NORMAL_MODE));
+           
+            if(!Drfl.connect_rt_control(host)) {
+                ROS_ERROR("unable to connect_rt_control");
             }
+            const std::string version   = "v1.0";
+            const float       period    = 0.001;
+            const int         losscount = 4;
+            if (!Drfl.set_rt_control_output(version, period, losscount)) {
+                ROS_ERROR("unable to set_rt_control_output");
+            }
+    
+            if (!Drfl.start_rt_control()) {
+                ROS_ERROR("unable to start_rt_control");
+
+            }
+
+            for(int i = 0; i < 10; i++) {
+                const LPRT_OUTPUT_DATA_LIST data = Drfl.read_data_rt();
+                if(data->time_stamp) {
+                    for(int i=0;i<NUM_JOINT;i++) {
+                        joints[i].pos = static_cast<float>(data->actual_joint_position[i] * (M_PI / 180.0f));
+                        joints[i].vel = static_cast<float>(data->actual_joint_velocity[i] * (M_PI / 180.0f));
+                        ROS_INFO("[init]::read %d-pos: %7.3f", i, rad2deg(joints[i].pos));
+                    }
+                    break;
+                }
+                sleep(1);
+            }
+
+            float limit[6] = {70.0f,70.0f,70.0f,70.0f,70.0f,70.0f};
+            if (!Drfl.set_velj_rt(limit)) ROS_ERROR("enable to set velj limit rt");
+            if (!Drfl.set_accj_rt(limit)) ROS_ERROR("enable to set accj limit rt");
+            
             return true;
          }
         return false;
@@ -1222,51 +1100,77 @@ namespace dsr_control{
 
     void DRHWInterface::read(ros::Duration& elapsed_time)
     {
-        std_msgs::Float64MultiArray msg;
-        // joints.pos, vel, eff should be update
-        //ROS_DEBUG("DRHWInterface::read()");
-        LPROBOT_POSE pose = Drfl.GetCurrentPose();
-        for(int i = 0; i < NUM_JOINT; i++){
-            ROS_DEBUG("[DRHWInterface::read] %d-pos: %7.3f", i, pose->_fPosition[i]);
-            joints[i].pos = deg2rad(pose->_fPosition[i]);	//update pos to Rviz
-            msg.data.push_back(joints[i].pos);
-        }
-        // CHEF: for now don't support m_strRobotGripper, it reads off the bounds of the joints array
-        /*
-        if(m_strRobotGripper != "none"){
-            msg.data.push_back(joints[6].pos);
-        }
-        */
-        m_PubtoGazebo.publish(msg);
+        
+        // TODO: move gazebo callback elsewhere, do old logic for virtual bot
+       // std_msgs::Float64MultiArray msg;
+		const LPRT_OUTPUT_DATA_LIST data = Drfl.read_data_rt();
+		for(int i=0;i<6;i++) {
+			joints[i].pos = static_cast<float>(data->actual_joint_position[i] * (M_PI / 180.0f));
+			joints[i].vel = static_cast<float>(data->actual_joint_velocity[i] * (M_PI / 180.0f));
+            //msg.data.push_back(joints[i].pos);
+		}
+
+       // m_PubtoGazebo.publish(msg);
     }
+
+    bool positionCommandRunning(const std::array<double, NUM_JOINT>& lhs, const std::array<double, NUM_JOINT>& rhs) {
+        double var = 0;
+        for(size_t i=0; i<lhs.size(); i++) {
+            var += abs(lhs[i] - rhs[i]);
+        }
+        return var >= 0.0001;
+    }
+    
     void DRHWInterface::write(ros::Duration& elapsed_time)
     {
         //ROS_INFO("DRHWInterface::write()");
         static int count = 0;
-        // joints.cmd is updated
-        std::array<float, NUM_JOINT> tmp;
-        for(int i = 0; i < NUM_JOINT; i++){
-            ROS_DEBUG("[write]::write %d-pos: %7.3f %d-vel: %7.3f %d-cmd: %7.3f",
-            i,
-            joints[i].pos,
-            i,
-            joints[i].vel,
-            i,
-            joints[i].cmd);
-            tmp[i] = joints[i].cmd;
+
+        if( !bCommand_ ){
+            return;
         }
-        if( !bCommand_ ) return;
-        /*int state = Drfl.GetRobotState();
-        if( state == STATE_STANDBY ){
+        
+
+        if(!positionCommandRunning(joint_command_positions, last_joint_command_positions)) {
+            return;
+        }
+        last_joint_command_positions = joint_command_positions;
+        
+        std::array<float, NUM_JOINT> cmd_to_send;
+        for(int i = 0; i < NUM_JOINT; i++) {
+
+            cmd_to_send[i] = rad2deg(joint_command_positions[i]);
+        }
+
+        for(int i = 0; i < NUM_JOINT; i++) {
+            // cmd_to_send[i] = rad2deg(joints[i].pos);
+            ROS_INFO(" target %i %f -> %f", i,rad2deg(joints[i].pos), cmd_to_send[i]);
+        }
+
+        // TODO: does this cache?
+        int state = Drfl.GetRobotState();
+        if( state == STATE_STANDBY ||  state == STATE_MOVING ) {
+            const float v=70.0;
+            float vel[6] = {v,v,v,v,v,v}; 
+
+            float acc[6] = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f}; // Complied with internal profile.
+
+            Drfl.servoj_rt(cmd_to_send.data(), vel, acc, float(elapsed_time.toSec() * 1.5));
+        }
+        Drfl.set_safety_mode(SAFETY_MODE_AUTONOMOUS,SAFETY_MODE_EVENT_MOVE);
+
+        // int state = Drfl.GetRobotState();
+        // if( state == STATE_STANDBY ){
+        /*
             for(int i = 0; i < NUM_JOINT; i++){
                 if( fabs(cmd_[i] - joints[i].cmd) > 0.0174532925 ){
                     Drfl.MoveJAsync(tmp.data(), 50, 50);
-                    ROS_INFO_STREAM("[write] current state: " << GetRobotStateString(state));
+                    //ROS_INFO_STREAM("[write] current state: " << GetRobotStateString(state));
                     std::copy(tmp.cbegin(), tmp.cend(), cmd_.begin());
                     break;
                 }
-            }
-        }*/
+            }*/
+        
     }
 
     //----- SIG Handler --------------------------------------------------------------
@@ -3109,63 +3013,14 @@ namespace dsr_control{
 
     bool DRHWInterface::robotiq_2f_move_cb(dsr_msgs::Robotiq2FMove::Request& req, dsr_msgs::Robotiq2FMove::Response& res)
     {
-        res.success = false;
-        //ROS_INFO("DRHWInterface::gripper_move_cb() called and calling Nothing");
-        /*
-        if(mode == "robotiq_2f"){
-            //Serial Communication
-            ser.Activation();
-            ros::Duration(0.1).sleep();
-            ser.Close();
-            ros::Duration(0.1).sleep();
-            ser.Open();
-        }
-        */
-        float goal_pos = req.width;
-
-        while(abs(goal_pos - joints[6].pos) > 0.01){
-            if(goal_pos > joints[6].pos){
-                joints[6].pos = joints[6].pos + 0.01;
-            }
-            else if(joints[6].pos > goal_pos){
-                joints[6].pos = joints[6].pos - 0.01;
-            }
-            ros::Duration(0.01).sleep();
-        }
-        res.success = true;
         return true;
     }
     bool DRHWInterface::robotiq_2f_open_cb(dsr_msgs::Robotiq2FOpen::Request& req, dsr_msgs::Robotiq2FOpen::Response& res)
     {
-        res.success = false;
-        float goal_pos = 0.8;
-        while(abs(goal_pos - joints[6].pos) > 0.01){
-            if(goal_pos > joints[6].pos){
-                joints[6].pos = joints[6].pos + 0.01;
-            }
-            else if(joints[6].pos > goal_pos){
-                joints[6].pos = joints[6].pos - 0.01;
-            }
-            ros::Duration(0.01).sleep();
-        }
-        res.success = true;
         return true;
     }
     bool DRHWInterface::robotiq_2f_close_cb(dsr_msgs::Robotiq2FClose::Request& req, dsr_msgs::Robotiq2FClose::Response& res)
     {
-        res.success = false;
-        float goal_pos = 0.0;
-
-        while(abs(goal_pos - joints[6].pos) > 0.01){
-            if(goal_pos > joints[6].pos){
-                joints[6].pos = joints[6].pos + 0.01;
-            }
-            else if(joints[6].pos > goal_pos){
-                joints[6].pos = joints[6].pos - 0.01;
-            }
-            ros::Duration(0.01).sleep();
-        }
-        res.success = true;
         return true;
     }
 
