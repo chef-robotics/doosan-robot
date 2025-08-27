@@ -401,7 +401,7 @@ namespace dsr_control{
         switch(eAccCtrl)
         {
         case MONITORING_ACCESS_CONTROL_REQUEST:
-            Drfl.manage_access_control(MANAGE_ACCESS_CONTROL_RESPONSE_NO);
+            Drfl.manage_access_control(MANAGE_ACCESS_CONTROL_FORCE_REQUEST);
             //Drfl.TransitControlAuth(MANaGE_ACCESS_CONTROL_RESPONSE_YES);
             break;
         case MONITORING_ACCESS_CONTROL_GRANT:
@@ -415,8 +415,7 @@ namespace dsr_control{
         case MONITORING_ACCESS_CONTROL_LOSS:
             g_bHasControlAuthority = FALSE;
             if (g_bTpInitailizingComplted) {
-                Drfl.manage_access_control(MANAGE_ACCESS_CONTROL_REQUEST);
-                //Drfl.TransitControlAuth(MANAGE_ACCESS_CONTROL_FORCE_REQUEST);
+                Drfl.manage_access_control(MANAGE_ACCESS_CONTROL_FORCE_REQUEST);
             }
             break;
         default:
@@ -1083,16 +1082,21 @@ namespace dsr_control{
                         joints[i].pos = static_cast<float>(data->actual_joint_position[i] * (M_PI / 180.0f));
                         joints[i].vel = static_cast<float>(data->actual_joint_velocity[i] * (M_PI / 180.0f));
                         ROS_INFO("[init]::read %d-pos: %7.3f", i, rad2deg(joints[i].pos));
+                        joint_command_positions[i] = joints[i].pos;
                     }
                     break;
                 }
                 sleep(1);
             }
+            last_joint_command_positions = joint_command_positions;
 
             float limit[6] = {70.0f,70.0f,70.0f,70.0f,70.0f,70.0f};
             if (!Drfl.set_velj_rt(limit)) ROS_ERROR("enable to set velj limit rt");
             if (!Drfl.set_accj_rt(limit)) ROS_ERROR("enable to set accj limit rt");
             
+            Drfl.set_safety_mode(SAFETY_MODE_AUTONOMOUS,SAFETY_MODE_EVENT_MOVE);
+
+
             return true;
          }
         return false;
@@ -1102,15 +1106,18 @@ namespace dsr_control{
     {
         
         // TODO: move gazebo callback elsewhere, do old logic for virtual bot
-       // std_msgs::Float64MultiArray msg;
+        std_msgs::Float64MultiArray msg;
 		const LPRT_OUTPUT_DATA_LIST data = Drfl.read_data_rt();
 		for(int i=0;i<6;i++) {
 			joints[i].pos = static_cast<float>(data->actual_joint_position[i] * (M_PI / 180.0f));
 			joints[i].vel = static_cast<float>(data->actual_joint_velocity[i] * (M_PI / 180.0f));
-            //msg.data.push_back(joints[i].pos);
+            
+            //joints[i].pos = joint_command_positions[i];
+            //ROS_INFO(" %i %f", i,rad2deg(joints[i].pos));
+            msg.data.push_back(joints[i].pos);
 		}
 
-       // m_PubtoGazebo.publish(msg);
+        m_PubtoGazebo.publish(msg);
     }
 
     bool positionCommandRunning(const std::array<double, NUM_JOINT>& lhs, const std::array<double, NUM_JOINT>& rhs) {
@@ -1142,22 +1149,21 @@ namespace dsr_control{
             cmd_to_send[i] = rad2deg(joint_command_positions[i]);
         }
 
-        for(int i = 0; i < NUM_JOINT; i++) {
-            // cmd_to_send[i] = rad2deg(joints[i].pos);
+        ROS_INFO("will move");
+        for(int i = 0; i < NUM_JOINT; i++) {            
             ROS_INFO(" target %i %f -> %f", i,rad2deg(joints[i].pos), cmd_to_send[i]);
         }
 
         // TODO: does this cache?
         int state = Drfl.GetRobotState();
         if( state == STATE_STANDBY ||  state == STATE_MOVING ) {
-            const float v=70.0;
+            const float v=1.0;
             float vel[6] = {v,v,v,v,v,v}; 
 
             float acc[6] = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f}; // Complied with internal profile.
 
             Drfl.servoj_rt(cmd_to_send.data(), vel, acc, float(elapsed_time.toSec() * 1.5));
         }
-        Drfl.set_safety_mode(SAFETY_MODE_AUTONOMOUS,SAFETY_MODE_EVENT_MOVE);
 
         // int state = Drfl.GetRobotState();
         // if( state == STATE_STANDBY ){

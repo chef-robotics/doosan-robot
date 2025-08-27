@@ -121,9 +121,10 @@ int main(int argc, char** argv) {
 
             curr_time = ros::Time::now();
             elapsed = curr_time - last_time;
+            last_time = curr_time;
             if (pArm)
                 pArm->read(elapsed);
-            cm.update(ros::Time::now(), elapsed);
+            cm.update(curr_time, elapsed);
             for (int i = 0; i < 6; i++) {
                 joint_state.header.stamp = curr_time;
                 joint_state.name.push_back(arm_joint_names[i]);
