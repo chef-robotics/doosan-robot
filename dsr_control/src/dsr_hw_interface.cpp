@@ -739,20 +739,12 @@ namespace dsr_control{
                 jnt_state_handle,
                 &joint_command_positions[i]);
             jnt_pos_interface.registerHandle(jnt_pos_handle);
+            
         }
         registerInterface(&jnt_state_interface);
         registerInterface(&jnt_pos_interface);
 
-        /*ros::V_string joint_names = boost::assign::list_of("front_left_wheel")("front_right_wheel")("rear_left_wheel")("rear_right_wheel");
-        for (unsigned int i = 0; i < joint_names.size(); i++){
-            hardware_interface::JointStateHandle joint_state_handle(joint_names[i], &joints[i].pos, &joints[i].vel, &joints[i].eff);
-            jnt_state_interface.registerHandle(joint_state_handle);
-
-            hardware_interface::JointHandle joint_handle(joint_state_handle, &joints[i].cmd);
-            velocity_joint_interface_.registerHandle(joint_handle);
-        }
-        registerInterface(&velocity_joint_interface_);
-        */
+        
 
         // Publisher msg
         m_PubRobotState = private_nh_.advertise<dsr_msgs::RobotState>("state",100);
@@ -965,6 +957,7 @@ namespace dsr_control{
     {
         //ROS_INFO("DRHWInterface::~DRHWInterface() 0");
         Drfl.close_connection();
+        Drfl.disconnect_rt_control();
 
         //ROS_INFO("DRHWInterface::~DRHWInterface() 1");
         m_th_publisher.join();   //kill publisher thread
@@ -1090,11 +1083,25 @@ namespace dsr_control{
             }
             last_joint_command_positions = joint_command_positions;
 
-            float limit[6] = {70.0f,70.0f,70.0f,70.0f,70.0f,70.0f};
-            if (!Drfl.set_velj_rt(limit)) ROS_ERROR("enable to set velj limit rt");
-            if (!Drfl.set_accj_rt(limit)) ROS_ERROR("enable to set accj limit rt");
+            float accel_limit[6] = {70.0f,70.0f,70.0f,70.0f,70.0f,70.0f};
+            float vel_limit[6] = {
+                rad2deg(3.67),
+                rad2deg(3.32),
+                rad2deg(3.67),
+                rad2deg(6.98),
+                rad2deg(6.98),
+                rad2deg(0.47),
+            };
+            if (!Drfl.set_velj_rt(vel_limit)) {
+                ROS_ERROR("enable to set velj limit rt");
+                return false;
+            }
+            if (!Drfl.set_accj_rt(accel_limit)) {
+                ROS_ERROR("enable to set accj limit rt");
+                return false;
+            }
             
-            Drfl.set_safety_mode(SAFETY_MODE_AUTONOMOUS,SAFETY_MODE_EVENT_MOVE);
+            //Drfl.set_safety_mode(SAFETY_MODE_AUTONOMOUS,SAFETY_MODE_EVENT_MOVE);
 
 
             return true;
@@ -1106,18 +1113,22 @@ namespace dsr_control{
     {
         
         // TODO: move gazebo callback elsewhere, do old logic for virtual bot
-        std_msgs::Float64MultiArray msg;
-		const LPRT_OUTPUT_DATA_LIST data = Drfl.read_data_rt();
+        //std_msgs::Float64MultiArray msg;
+		last_rt_robot_state = Drfl.read_data_rt();
+        if(!last_rt_robot_state) {
+            return;
+        }
 		for(int i=0;i<6;i++) {
-			joints[i].pos = static_cast<float>(data->actual_joint_position[i] * (M_PI / 180.0f));
-			joints[i].vel = static_cast<float>(data->actual_joint_velocity[i] * (M_PI / 180.0f));
+			joints[i].pos = static_cast<float>(last_rt_robot_state->actual_joint_position[i] * (M_PI / 180.0f));
+			joints[i].vel = static_cast<float>(last_rt_robot_state->actual_joint_velocity[i] * (M_PI / 180.0f));
+            joints[i].eff = static_cast<float>(last_rt_robot_state->actual_joint_torque[i]);
             
             //joints[i].pos = joint_command_positions[i];
             //ROS_INFO(" %i %f", i,rad2deg(joints[i].pos));
-            msg.data.push_back(joints[i].pos);
+            //msg.data.push_back(joints[i].pos);
 		}
 
-        m_PubtoGazebo.publish(msg);
+        //m_PubtoGazebo.publish(msg);
     }
 
     bool positionCommandRunning(const std::array<double, NUM_JOINT>& lhs, const std::array<double, NUM_JOINT>& rhs) {
@@ -1131,39 +1142,83 @@ namespace dsr_control{
     void DRHWInterface::write(ros::Duration& elapsed_time)
     {
         //ROS_INFO("DRHWInterface::write()");
-        static int count = 0;
 
         if( !bCommand_ ){
             return;
         }
-        
-
-        if(!positionCommandRunning(joint_command_positions, last_joint_command_positions)) {
+        if(!last_rt_robot_state) {
+            // ROS_ERROR("no robot state");
             return;
         }
-        last_joint_command_positions = joint_command_positions;
+        // if(last_rt_robot_state->robot_state != STATE_STANDBY && last_rt_robot_state->robot_state != STATE_MOVING) {
+        //     ROS_ERROR("no state is %i", last_rt_robot_state->robot_state);
+
+        //     return;
+        // }
         
-        std::array<float, NUM_JOINT> cmd_to_send;
+
+        if(false && !positionCommandRunning(joint_command_positions, last_joint_command_positions)) {
+            idle_hack = true;
+            return;
+        }
+
+        
+        static float dir = 1;
+        const static float deg_sec = 10.0;
+        
+        const float amount = deg_sec * elapsed_time.toSec() * dir;
+
+        const float deg_limit = 90;
+
+        ROS_INFO("move from %f by %f", joint_command_positions[5], amount);
+        joint_command_positions[5] = joints[5].pos + deg2rad(amount);
+        if (joint_command_positions[5] > deg2rad(deg_limit)) {
+            dir = -1;
+        }
+        if (joint_command_positions[5] < -deg2rad(deg_limit)) {
+            dir = 1;
+        }
+        ROS_INFO("move to %f", joint_command_positions[5]);
+
+        last_joint_command_positions = joint_command_positions;
+
+        std::array<float, NUM_JOINT> requested_positions;
+        //std::array<float, NUM_JOINT> requested_velocities;
         for(int i = 0; i < NUM_JOINT; i++) {
 
-            cmd_to_send[i] = rad2deg(joint_command_positions[i]);
+            requested_positions[i] = rad2deg(joint_command_positions[i]);
+            //requested_velocities[i] = joint_command_velocities[i];
         }
 
-        ROS_INFO("will move");
+//        int state = Drfl.GetRobotState();
+
+  //      if( state == STATE_STANDBY ||  state == STATE_MOVING ) {
+
+            if(idle_hack) {
+                // This is workaround to overcome issues :
+                // move_joint (drfl) API internally sent safety_off right after moving. 
+                // which occurs problems like :
+                // "move_joint service command -> trajectory command => error ! "
+                Drfl.set_safety_mode(SAFETY_MODE_AUTONOMOUS,SAFETY_MODE_EVENT_MOVE);
+                idle_hack = false;
+            }
+
+
+//            ROS_INFO("elapsed time %f", elapsed_time.toSec());
         for(int i = 0; i < NUM_JOINT; i++) {            
-            ROS_INFO(" target %i %f -> %f", i,rad2deg(joints[i].pos), cmd_to_send[i]);
+            //ROS_INFO(" target %i %f -> %f", i,rad2deg(joints[i].pos), requested_positions[i]);
         }
-
-        // TODO: does this cache?
-        int state = Drfl.GetRobotState();
-        if( state == STATE_STANDBY ||  state == STATE_MOVING ) {
-            const float v=1.0;
-            float vel[6] = {v,v,v,v,v,v}; 
-
-            float acc[6] = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f}; // Complied with internal profile.
-
-            Drfl.servoj_rt(cmd_to_send.data(), vel, acc, float(elapsed_time.toSec() * 1.5));
-        }
+           float vel[6] = {100.0, 100.0, 100.0, 100.0, 100.0,100.0};//deg_sec}; // Complied with internal profile.
+           ROS_INFO("vel is %f?", vel[5]);
+            float acc[6] = {100.0f, 100.0f, 100.0f, 100.0f, 100.0f, 100.0f}; // Complied with internal profile.
+            
+           Drfl.servoj_rt(requested_positions.data(), vel, acc, float(elapsed_time.toSec() * 1.1));
+           // not bad!
+           // Drfl.amovej(requested_positions.data(), vel, acc, float(elapsed_time.toSec() * 1.1),MOVE_MODE_ABSOLUTE, BLENDING_SPEED_TYPE_OVERRIDE);
+           
+         //   Drfl.MoveJAsync(requested_positions.data(), (float)50, (float)50, elapsed_time.toSec() * 1.1,MOVE_MODE_ABSOLUTE, BLENDING_SPEED_TYPE_OVERRIDE);
+ ROS_INFO("post move");
+//        }
 
         // int state = Drfl.GetRobotState();
         // if( state == STATE_STANDBY ){

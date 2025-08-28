@@ -538,6 +538,7 @@ namespace dsr_control{
         static void OnMonitoringStateCB(const ROBOT_STATE eState);
         static void OnMonitoringAccessControlCB(const MONITORING_ACCESS_CONTROL eAccCtrl);
         static void OnLogAlarm(LPLOG_ALARM pLogAlarm);
+        static void OnMonitoringSafetyStop(const char*);
 
         static void OnTpPopupCB(LPMESSAGE_POPUP tPopup);
         static void OnTpLogCB(const char* strLog);
@@ -560,6 +561,8 @@ namespace dsr_control{
         } joints[NUM_JOINT];
         std::array<double, NUM_JOINT> joint_command_positions = {};
         std::array<double, NUM_JOINT> last_joint_command_positions = {};
+
+        LPRT_OUTPUT_DATA_LIST last_rt_robot_state = nullptr;
     private:
         int  m_nVersionDRCF;
         bool m_bIsEmulatorMode; 
@@ -622,12 +625,12 @@ namespace dsr_control{
         // ROS Interface
         hardware_interface::JointStateInterface jnt_state_interface;
         hardware_interface::PositionJointInterface jnt_pos_interface;
-        hardware_interface::VelocityJointInterface velocity_joint_interface_;
+        //hardware_interface::VelocityJointInterface velocity_joint_interface_;
 
         std::array<float, NUM_JOINT> cmd_;
         bool bCommand_;
         
-
+        bool idle_hack = false;
         //----- SIG Handler --------------------------------------------------------------
         void sigint_handler( int signo);
 
