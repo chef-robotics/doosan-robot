@@ -21,6 +21,12 @@ using namespace dsr_control;
 
 int g_nKill_dsr_control = false;
 
+// huge hack
+namespace std {
+void __throw_bad_array_new_length() {
+    throw bad_array_new_length();
+}
+}
 bool isEmulatorRunning() {
     return false;
     FILE *cmd_pipe = popen("docker ps -q --filter name=emulator", "r");
