@@ -114,11 +114,10 @@ int main(int argc, char** argv) {
     ros::AsyncSpinner spinner(1);
     spinner.start();
     
-    ros::Time last_time;
+    
     ros::Time curr_time;
-    ros::Duration elapsed;
-    last_time = ros::Time::now();
-
+    ros::Duration elapsed = r.expectedCycleTime();
+    
     ROS_INFO("[dsr_control] controller_manager is updating!");
 
     while (ros::ok() && (false==g_nKill_dsr_control)) {
@@ -126,8 +125,7 @@ int main(int argc, char** argv) {
             sensor_msgs::JointState joint_state;
 
             curr_time = ros::Time::now();
-            elapsed = curr_time - last_time;
-            last_time = curr_time;
+
             if (pArm)
                 pArm->read(elapsed);
             cm.update(curr_time, elapsed);
