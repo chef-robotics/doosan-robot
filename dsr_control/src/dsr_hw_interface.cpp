@@ -342,7 +342,7 @@ namespace dsr_control{
         //This function is called when the state changes.
         //ROS_INFO("DRHWInterface::OnMonitoringStateCB");
         // Only work within 50msec
-        ROS_INFO("On Monitor State");
+        //ROS_INFO("On Monitor State");
         switch((unsigned char)eState)
         {
 #if 1 // TP initializing logic, Don't use in API level. (If you want to operate without TP, use this logic)
@@ -368,18 +368,19 @@ namespace dsr_control{
             }
             break;
         case STATE_SAFE_OFF:
+        
             if (g_bHasControlAuthority){
                 Drfl.set_robot_control(CONTROL_SERVO_ON);
-				Drfl.set_robot_mode(ROBOT_MODE_MANUAL);   //Idle Servo Off 후 servo on 하는 상황 발생 시 set_robot_mode 명령을 전송해 manual 로 전환. add 2020/04/28
+				Drfl.set_robot_mode(ROBOT_MODE_AUTONOMOUS);   //Idle Servo Off 후 servo on 하는 상황 발생 시 set_robot_mode 명령을 전송해 manual 로 전환. add 2020/04/28
             }
             break;
         case STATE_SAFE_STOP2:
             if (g_bHasControlAuthority) Drfl.set_robot_control(CONTROL_RECOVERY_SAFE_STOP);
             break;
         case STATE_SAFE_OFF2:
-            if (g_bHasControlAuthority) {
+            //if (g_bHasControlAuthority) {
                 Drfl.set_robot_control(CONTROL_RECOVERY_SAFE_OFF);
-            }
+            //}
             break;
         case STATE_RECOVERY:
             Drfl.set_robot_control(CONTROL_RESET_RECOVERY);
@@ -388,7 +389,7 @@ namespace dsr_control{
             break;
         }
 
-        cout << "[callback OnMonitoringStateCB] current state: " << GetRobotStateString((int)eState) << endl;
+       cout << "[callback OnMonitoringStateCB] current state: " << GetRobotStateString((int)eState) << endl;
         g_stDrState.nRobotState = (int)eState;
         strncpy(g_stDrState.strRobotState, GetRobotStateString((int)eState), MAX_SYMBOL_SIZE);
     }
@@ -739,10 +740,19 @@ namespace dsr_control{
                 jnt_state_handle,
                 &joint_command_positions[i]);
             jnt_pos_interface.registerHandle(jnt_pos_handle);
+
+            hardware_interface::PosVelJointHandle jnt_pv_handle(
+                jnt_state_handle,
+                &joint_command_positions[i],
+                &joint_command_velocities[i]);
+            
+            jnt_pos_vel_interface.registerHandle(jnt_pv_handle);
+
             
         }
         registerInterface(&jnt_state_interface);
         registerInterface(&jnt_pos_interface);
+        registerInterface(&jnt_pos_vel_interface);
 
         
 
@@ -956,8 +966,10 @@ namespace dsr_control{
     DRHWInterface::~DRHWInterface()
     {
         //ROS_INFO("DRHWInterface::~DRHWInterface() 0");
-        Drfl.close_connection();
+        Drfl.stop_rt_control();
         Drfl.disconnect_rt_control();
+        Drfl.close_connection();
+        
 
         //ROS_INFO("DRHWInterface::~DRHWInterface() 1");
         m_th_publisher.join();   //kill publisher thread
@@ -973,18 +985,19 @@ namespace dsr_control{
         int nServerPort = 12345;
         ROS_INFO("INIT@@@@@@@@@@@@@@@@@@@@@@@@@");
         //--- doosan API's call-back fuctions : Only work within 50msec in call-back functions
-        Drfl.set_on_tp_initializing_completed(OnTpInitializingCompletedCB);
         Drfl.set_on_homming_completed(OnHommingCompletedCB);
         Drfl.set_on_program_stopped(OnProgramStoppedCB);
         Drfl.set_on_monitoring_modbus(OnMonitoringModbusCB);
         Drfl.set_on_monitoring_data(OnMonitoringDataCB);           // Callback function in M2.4 and earlier
         Drfl.set_on_monitoring_ctrl_io(OnMonitoringCtrlIOCB);       // Callback function in M2.4 and earlier
-        Drfl.set_on_monitoring_state(OnMonitoringStateCB);
-        Drfl.set_on_monitoring_access_control(OnMonitoringAccessControlCB);
         Drfl.set_on_log_alarm(OnLogAlarm);
         Drfl.set_on_tp_popup(OnTpPopupCB);
-        Drfl.set_on_tp_log(OnTpLogCB);
         Drfl.set_on_tp_get_user_input(OnTpGetUserInputCB);
+        Drfl.set_on_tp_initializing_completed(OnTpInitializingCompletedCB);
+        Drfl.set_on_monitoring_access_control(OnMonitoringAccessControlCB);
+        Drfl.set_on_monitoring_state(OnMonitoringStateCB);
+        Drfl.set_on_tp_log(OnTpLogCB);
+
         //Drfl.set_on_tp_progress(OnTpProgressCB);
 
         ROS_INFO("[dsr_hw_interface] init() ==> arm is standby");
@@ -1043,7 +1056,7 @@ namespace dsr_control{
             }
 
             //--- Set Robot mode : MANUAL or AUTO
-            //assert(Drfl.SetRobotMode(ROBOT_MODE_MANUAL));
+            // assert(Drfl.SetRobotMode(ROBOT_MODE_MANUAL));
             assert(Drfl.set_robot_mode(ROBOT_MODE_AUTONOMOUS));
             
             //--- Set Robot mode : virual or real
@@ -1059,13 +1072,12 @@ namespace dsr_control{
             const std::string version   = "v1.0";
             const float       period    = 0.001;
             const int         losscount = 4;
+            
             if (!Drfl.set_rt_control_output(version, period, losscount)) {
                 ROS_ERROR("unable to set_rt_control_output");
             }
-    
             if (!Drfl.start_rt_control()) {
                 ROS_ERROR("unable to start_rt_control");
-
             }
 
             for(int i = 0; i < 10; i++) {
@@ -1083,16 +1095,17 @@ namespace dsr_control{
             }
             last_joint_command_positions = joint_command_positions;
 
-            float accel_limit[6] = {150.0f,150.0f,150.0f,150.0f,150.0f,150.0f};
+            float accel_limit[6] = {rad2deg(50.0f),rad2deg(50.0f),rad2deg(50.0f),rad2deg(50.0f),rad2deg(50.0f),rad2deg(50.0f)};
             float vel_limit[6] = {
-                rad2deg(3.67),
-                rad2deg(3.32),
-                rad2deg(3.67),
-                rad2deg(6.98),
-                rad2deg(6.98),
-                rad2deg(0.47),
+                120,
+                120,
+                150,
+                225,
+                225,
+                225
+
             };
-            /*
+            
             if (!Drfl.set_velj_rt(vel_limit)) {
                 ROS_ERROR("enable to set velj limit rt");
                 return false;
@@ -1100,10 +1113,9 @@ namespace dsr_control{
             if (!Drfl.set_accj_rt(accel_limit)) {
                 ROS_ERROR("enable to set accj limit rt");
                 return false;
-            }*/
+            }
             
-            //Drfl.set_safety_mode(SAFETY_MODE_AUTONOMOUS,SAFETY_MODE_EVENT_MOVE);
-
+            Drfl.set_safety_mode(SAFETY_MODE_AUTONOMOUS,SAFETY_MODE_EVENT_MOVE);
 
             return true;
          }
@@ -1112,7 +1124,6 @@ namespace dsr_control{
 
     void DRHWInterface::read(ros::Duration& elapsed_time)
     {
-        
         // TODO: move gazebo callback elsewhere, do old logic for virtual bot
         //std_msgs::Float64MultiArray msg;
 		last_rt_robot_state = Drfl.read_data_rt();
@@ -1165,25 +1176,25 @@ namespace dsr_control{
             idle_hack = true;
             return;
         }
+        const float deg_limit = 90;
 
         
         static float dir = 1;
-        const static float deg_sec = 10.0;
-        const float adj_time = fmin(elapsed_time.toSec(), 0.1f);
-        const float amount = deg_sec * adj_time * dir;
-
-        const float deg_limit = 90;
-/*
-        ROS_INFO("move from %f by %f %f", rad2deg(joint_command_positions[5]), amount, adj_time);
-        joint_command_positions[5] = joints[5].pos + deg2rad(amount);
         if (joint_command_positions[5] > deg2rad(deg_limit)) {
             dir = -1;
         }
         if (joint_command_positions[5] < -deg2rad(deg_limit)) {
             dir = 1;
         }
-            */
-        ROS_INFO("move to %f", rad2deg(joint_command_positions[5]));
+
+        const static float deg_sec = 30;
+        const float adj_time = elapsed_time.toSec();// fmin(elapsed_time.toSec(), 0.01f);
+        const float amount = deg_sec * adj_time * dir;
+
+
+        ROS_INFO("move from %f by %f %f", rad2deg(joint_command_positions[5]), amount, adj_time);
+//        joint_command_positions[5] = joints[5].pos + deg2rad(amount);
+
 
         last_joint_command_positions = joint_command_positions;
 
@@ -1191,7 +1202,7 @@ namespace dsr_control{
         //std::array<float, NUM_JOINT> requested_velocities;
         for(int i = 0; i < NUM_JOINT; i++) {
 
-            requested_positions[i] = rad2deg(joint_command_positions[i]);
+           requested_positions[i] = rad2deg(joint_command_positions[i]);
             //requested_velocities[i] = joint_command_velocities[i];
         }
 
@@ -1204,24 +1215,32 @@ namespace dsr_control{
                 // move_joint (drfl) API internally sent safety_off right after moving. 
                 // which occurs problems like :
                 // "move_joint service command -> trajectory command => error ! "
-              //  Drfl.set_safety_mode(SAFETY_MODE_AUTONOMOUS,SAFETY_MODE_EVENT_MOVE);
+                Drfl.set_safety_mode(SAFETY_MODE_AUTONOMOUS,SAFETY_MODE_EVENT_MOVE);
                 idle_hack = false;
             }
+                // Drfl.set_safety_mode(SAFETY_MODE_AUTONOMOUS,SAFETY_MODE_EVENT_MOVE);
 
 
 //            ROS_INFO("elapsed time %f", elapsed_time.toSec());
-        for(int i = 0; i < NUM_JOINT; i++) {            
-            //ROS_INFO(" target %i %f -> %f", i,rad2deg(joints[i].pos), requested_positions[i]);
-        }
-           float vel[6] = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f,deg_sec}; // Complied with internal profile.
-           ROS_INFO("vel is %f?", vel[5]);
-            float acc[6] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0}; // Complied with internal profile.
+    int i = 5;
+
+            //ROS_INFO(" target %i %f -> %f in %f", i,rad2deg(joints[i].pos), requested_positions[i], adj_time);
+            // ROS_INFO(" target %i fCurrentPosj %f fJointAbs %f fTargetPosj %f fTargetVelj %f" , i,
+            //     g_stDrState.fCurrentPosj[i],
+            //     g_stDrState.fJointAbs[i], 
+            //     g_stDrState.fTargetPosj[i],
+            //     g_stDrState.fTargetVelj[i]);
             
-           //Drfl.servoj_rt(requested_positions.data(), vel, acc, float(elapsed_time.toSec() * 1.5));
-            Drfl.amovej(requested_positions.data(), vel, acc, float(adj_time * 1.1),MOVE_MODE_ABSOLUTE, BLENDING_SPEED_TYPE_OVERRIDE);
+           float vel[6] = {-10000.0, -10000.0, -10000.0, -10000.0, -10000.0,-10000.0}; // Complied with internal profile.
+        //    ROS_INFO("vel is %f?", vel[5]);
+            float acc[6] = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f}; // Complied with internal profile.
+            float target_vel_acc[6] = {150.0, 150.0, 150.0, 150.0, 150.0, 150.0};
+
+               Drfl.servoj_rt(requested_positions.data(), vel, acc, float(adj_time * 1.1));
+            // Drfl.amovej(requested_positions.data(), target_vel_acc, target_vel_acc,  float(adj_time * 1.5), MOVE_MODE_ABSOLUTE, BLENDING_SPEED_TYPE_OVERRIDE);
            
          //   Drfl.MoveJAsync(requested_positions.data(), (float)50, (float)50, elapsed_time.toSec() * 1.1,MOVE_MODE_ABSOLUTE, BLENDING_SPEED_TYPE_OVERRIDE);
- ROS_INFO("post move");
+ //ROS_INFO("post move");
 //        }
 
         // int state = Drfl.GetRobotState();

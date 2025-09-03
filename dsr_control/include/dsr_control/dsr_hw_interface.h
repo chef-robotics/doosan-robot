@@ -47,6 +47,7 @@
 #include <algorithm>  // std::copy
 #include <hardware_interface/joint_command_interface.h>
 #include <hardware_interface/joint_state_interface.h>
+#include <hardware_interface/posvel_command_interface.h>
 #include <hardware_interface/robot_hw.h>
 #include <actionlib/server/simple_action_server.h>
 
@@ -561,6 +562,7 @@ namespace dsr_control{
         } joints[NUM_JOINT];
         std::array<double, NUM_JOINT> joint_command_positions = {};
         std::array<double, NUM_JOINT> last_joint_command_positions = {};
+        std::array<double, NUM_JOINT> joint_command_velocities = {};
 
         LPRT_OUTPUT_DATA_LIST last_rt_robot_state = nullptr;
     private:
@@ -625,7 +627,7 @@ namespace dsr_control{
         // ROS Interface
         hardware_interface::JointStateInterface jnt_state_interface;
         hardware_interface::PositionJointInterface jnt_pos_interface;
-        //hardware_interface::VelocityJointInterface velocity_joint_interface_;
+        hardware_interface::PosVelJointInterface jnt_pos_vel_interface;
 
         std::array<float, NUM_JOINT> cmd_;
         bool bCommand_;
