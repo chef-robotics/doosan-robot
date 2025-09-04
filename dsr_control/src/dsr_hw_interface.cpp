@@ -28,12 +28,23 @@ int g_nAnalogOutputModeCh2;
 
 
 float vel_limit[6] = {
-    120,
-    120,
-    150,
-    225,
-    225,
-    225
+    120 * 2,
+    120 * 2,
+    150 * 2,
+    225 * 2,
+    225 * 2,
+    225 * 2,
+};
+
+
+float accel_limit[6] = {
+    (240.0f),
+    (240.0f),
+    (300.0f),
+    (450.0f),
+    (450.0f),
+    (450.0f)
+
 };
 
 #define STABLE_BAND_JNT     0.05
@@ -1097,15 +1108,6 @@ namespace dsr_control{
             }
             last_joint_command_positions = joint_command_positions;
 
-            float accel_limit[6] = {
-                rad2deg(100.0f),
-                rad2deg(100.0f),
-                rad2deg(100.0f),
-                rad2deg(100.0f),
-                rad2deg(100.0f),
-                rad2deg(100.0f)
-
-            };
             
             
             if (!Drfl.set_velj_rt(vel_limit)) {
