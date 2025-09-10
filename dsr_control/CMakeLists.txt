@@ -18,7 +18,7 @@ catkin_package(
 )
 
 if(NOT DEFINED DRCF_VER)
-  set(DRCF_VER 2)
+  set(DRCF_VER 3)
 endif()
 message(DRCF_VERSION : ${DRCF_VER})
 

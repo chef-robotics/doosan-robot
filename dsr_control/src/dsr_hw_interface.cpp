@@ -28,12 +28,12 @@ int g_nAnalogOutputModeCh2;
 
 
 float vel_limit[6] = {
-    120 * 2,
-    120 * 2,
-    150 * 2,
-    225 * 2,
-    225 * 2,
-    225 * 2,
+    120,
+    120,
+    150,
+    225,
+    225,
+    225,
 };
 
 
@@ -1159,6 +1159,8 @@ namespace dsr_control{
     {
         //ROS_INFO("DRHWInterface::write()");
 
+// TODO: if was in pstop state, lock out for 2s
+
         if( !bCommand_ ){
             return;
         }
@@ -1180,11 +1182,7 @@ namespace dsr_control{
             idle_hack = true;
             return;
         }
-        const float deg_limit = 90;
-
         
-
-        const static float deg_sec = 30;
         const float adj_time = elapsed_time.toSec();
         
         last_joint_command_positions = joint_command_positions;
