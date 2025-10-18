@@ -104,7 +104,7 @@ namespace dsr_control{
         cout << "[callback OnTpInitializingCompletedCB] tp initializing completed" << endl;
         g_bTpInitailizingComplted = TRUE;
         //Drfl.ManageAccessControl(MANAGE_ACCESS_CONTROL_REQUEST);
-        Drfl.manage_access_control(MANAGE_ACCESS_CONTROL_FORCE_REQUEST);
+        //Drfl.manage_access_control(MANAGE_ACCESS_CONTROL_FORCE_REQUEST);
 
         g_stDrState.bTpInitialized = TRUE;
     }
@@ -260,7 +260,7 @@ namespace dsr_control{
     {
         // This function is called every 100 msec
         // Only work within 50msec
-        //ROS_INFO("DRHWInterface::OnMonitoringDataExCB");
+        ROS_INFO("DRHWInterface::OnMonitoringDataExCB");
 
         g_stDrState.nActualMode  = pData->_tCtrl._tState._iActualMode;                  // position control: 0, torque control: 1 ?????
         g_stDrState.nActualSpace = pData->_tCtrl._tState._iActualSpace;                 // joint space: 0, task space: 1
@@ -391,7 +391,7 @@ namespace dsr_control{
         case STATE_SAFE_OFF:
         
             if (g_bHasControlAuthority){
-                Drfl.set_robot_control(CONTROL_SERVO_ON);
+                //Drfl.set_robot_control(CONTROL_SERVO_ON);
 				Drfl.set_robot_mode(ROBOT_MODE_AUTONOMOUS);   //Idle Servo Off 후 servo on 하는 상황 발생 시 set_robot_mode 명령을 전송해 manual 로 전환. add 2020/04/28
             }
             break;
@@ -424,7 +424,7 @@ namespace dsr_control{
         {
         case MONITORING_ACCESS_CONTROL_REQUEST:
             Drfl.manage_access_control(MANAGE_ACCESS_CONTROL_FORCE_REQUEST);
-            //Drfl.TransitControlAuth(MANaGE_ACCESS_CONTROL_RESPONSE_YES);
+            Drfl.manage_access_control(MANAGE_ACCESS_CONTROL_RESPONSE_YES);
             break;
         case MONITORING_ACCESS_CONTROL_GRANT:
             cout  << "access control granted" << endl;
@@ -1061,6 +1061,7 @@ namespace dsr_control{
                 Drfl.setup_monitoring_version(1);                        //Enabling extended monitoring functions
             }
 
+                return true;
             //--- Check Robot State : STATE_STANDBY ---
             int delay;
             ros::param::param<int>("~standby", delay, 5000);
